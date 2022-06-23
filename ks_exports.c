@@ -26,15 +26,6 @@ int parcount;
 char** parnames;
 int* partypes;
 
-kela_function dummy = {
-	.name = "dummy",
-	.tree = NULL,
-	.parameter_count = 0,
-	.parameters = NULL,
-};
-
-
-
 kela_function* get_function(char const * function_name){
 	for(int i = 0; i < kela_function_count; i++){
 		if(!strcmp(kfuncs[i].name, function_name)){
@@ -42,7 +33,7 @@ kela_function* get_function(char const * function_name){
 		}
 	}
 
-	return &dummy;
+	return NULL;
 }
 
 char const * const * get_function_parameters(char const * function_name, int* count){
