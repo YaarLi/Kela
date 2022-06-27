@@ -55,3 +55,5 @@ TreeNode* parse();
 
 void printtree(TreeNode* p);
 int execute(TreeNode* N);
+
+#define STACK_SIZE 2000

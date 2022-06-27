@@ -39,7 +39,7 @@ kela_function* get_function(char const * function_name){
 char const * const * get_function_parameters(char const * function_name, int* count){
 	kela_function* func = get_function(function_name);
 	if(!func) return NULL;
-	if(count){*count = parcount;}
+	if(count){*count = func->parameter_count;}
 	return (char const * const *) func->parameters;
 }
 
@@ -116,6 +116,7 @@ char* run_function(char* name, int* parameter_values){
 	pthread_mutex_lock(&uses_global_variables);
 	funcname = strdup(name);
 	pthread_t thread;
+	printf("creating thread...");
 	int res = pthread_create(&thread, NULL, kela_run, (void*) parameter_values);
 	if(res){
 		pthread_mutex_unlock(&uses_global_variables);
