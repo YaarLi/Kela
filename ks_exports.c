@@ -84,7 +84,52 @@ void* kela_run(void* argv){
 	return (void*) (long) ret;
 }
 
+void* kela_eval(void* args){
+	kela_function kelfun;
+	symbols = kelfun.symbols;
+	initialise_symbols();
+	kelfun.name = strdup("tmp");
+	kelfun.parameter_count = parcount;
+	kelfun.tree = parse();
+	if(!kelfun.tree){
+		printf("parse returned NULL!\n");
+		return strdup("Compilation NULL error!\n");
+	}
+	
+	int ret = execute(kelfun.tree);
+	
+	char* rep = malloc(100);
+	rep[99] = '\0'; //just in case something goes wrong next step
+	snprintf(rep, 99, "Call returned: %d", ret);
+	return rep;
+
+}
+
 pthread_mutex_t uses_global_variables;
+
+char* eval(char* script){
+	pthread_mutex_lock(&uses_global_variables);
+	script_string = script;
+	script_char_ind = 0;
+	parcount = 0;
+	pthread_t thread;
+	int res = pthread_create(&thread, NULL, kela_eval, NULL);
+	if(res){
+		pthread_mutex_unlock(&uses_global_variables);
+		return strdup("Failed to initiate compilation");
+	}
+		//printf("failed to create compilation thread! (%d)\n", res); return res;}
+	char* rep = NULL;
+	res = pthread_join(thread, (void**) &rep);
+	if(res){
+		pthread_mutex_unlock(&uses_global_variables);
+		return strdup("Unhandled error during compilation");
+	}
+
+	pthread_mutex_unlock(&uses_global_variables);
+	return rep;
+	
+}
 
 char* compile(char* name, int parameter_count, char** parameter_names, int* parameter_types, char* script){
 	pthread_mutex_lock(&uses_global_variables);

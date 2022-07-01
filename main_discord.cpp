@@ -130,25 +130,39 @@ int main()
         if (dpp::run_once<struct register_bot_commands>()) {
 
             /* Create a new global command on ready event */
-            dpp::slashcommand newcommand("compile", "Compile a kelascript command", bot.me.id);
+            dpp::slashcommand compcommand("compile", "Compile a kelascript command", bot.me.id);
 
-            newcommand.add_option(
+            compcommand.add_option(
                     dpp::command_option(dpp::co_string, "name", "The name of the command", true)
             );
-            newcommand.add_option(
+            compcommand.add_option(
 					dpp::command_option(dpp::co_string, "int_parameters", "The variable names of integer parameters", true)
 			);
-            newcommand.add_option(
+            compcommand.add_option(
             		dpp::command_option(dpp::co_string, "code", "The actual code", true)
             );
-            newcommand.add_option(
+            compcommand.add_option(
             		dpp::command_option(dpp::co_string, "description", "The description that the user sees for the new slash command", true)
             );
 
             /* Register the command */
-            bot.global_command_create(newcommand);
-            bot.guild_command_create(newcommand, 545231706299301888);
+            bot.global_command_create(compcommand);
+            bot.guild_command_create(compcommand, 545231706299301888);
             printf("Compile command created\n");
+            
+            
+
+            dpp::slashcommand evalcommand("eval", "Evaluate code without saving it as command", bot.me.id);
+            evalcommand.add_option(
+            		dpp::command_option(dpp::co_string, "code", "The code", true)
+            );
+
+
+            /* Register the command */
+            bot.global_command_create(evalcommand);
+            bot.guild_command_create(evalcommand, 545231706299301888);
+            printf("Compile command created\n");
+            
         }
         } catch (const std::exception& e){
         	std::cout << e.what();
@@ -160,7 +174,8 @@ int main()
 
     bot.on_interaction_create([&bot](const dpp::interaction_create_t & event) {
     	try {
-			if (event.command.get_command_name() == "compile") {
+			std::string commandname = event.command.get_command_name();
+			if (commandname == "compile") {
 				std::cout << "getting compilation data\n";
 				int varcount;
 				//auto p = event.get_parameter("name");
@@ -195,6 +210,20 @@ int main()
 				bot.guild_command_create(newcommand, event.command.guild_id);
 				save_command(funcname, event.command.guild_id, rawcode, varcount, varnames);
 				event.reply(dpp::message("Compilation successful, you should see the new slash command shortly!"));
+			} else if(commandname == "eval"){
+				std::string rawcode = std::get<std::string>(event.get_parameter("code"));
+				char* code = strdup(rawcode.c_str());
+				std::cout << "compiling and running\n";
+				char* rep = eval(code);
+				if(!rep){
+					event.reply("Error - eval function call returned NULL. This is a bug.\n");
+					return;
+				}
+				std::stringstream ss;
+				ss << '`' << rep << '`';
+				event.reply(ss.str());
+				
+			
 			} else {
 				std::stringstream ss;
 				ss << event.command.guild_id << event.command.get_command_name();
