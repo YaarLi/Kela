@@ -50,7 +50,7 @@ TreeNode* block(){
 
 TreeNode* list(){
 	TreeNode *A, *B, *C;
-	int L;
+	//int L;
 	switch(lookahead){
 	case ID:
 	case TYPE:
@@ -62,14 +62,26 @@ TreeNode* list(){
 		}
 		return A;
 	case IF:
+		//L = lookahead;
+		match(IF); match('(');
+		A = expression();
+		match(')');
+		B = block();
+		if(lookahead == ELSE){
+			match(ELSE);
+			C = block();
+		} else {
+			C = mkleaf(0, 0); //do nothing node
+		}
+		return mknode(';', mknode(IF, A, B, C), list(), NULL);
 	case WHILE:
-		L = lookahead;
-		match(L); match('(');
+		//L = lookahead;
+		match(WHILE); match('(');
 		A = expression();
 		match(')');
 		B = block();
 		C = list();
-		return mknode(L, A, B, C);
+		return mknode(WHILE, A, B, C);
 	case RETURN:
 		match(RETURN);
 		A = expression();

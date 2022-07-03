@@ -147,7 +147,7 @@ int main()
 
             /* Register the command */
             bot.global_command_create(compcommand);
-            bot.guild_command_create(compcommand, 545231706299301888);
+            //bot.guild_command_create(compcommand, 545231706299301888);
             printf("Compile command created\n");
             
             
@@ -156,12 +156,20 @@ int main()
             evalcommand.add_option(
             		dpp::command_option(dpp::co_string, "code", "The code", true)
             );
-
-
             /* Register the command */
             bot.global_command_create(evalcommand);
-            bot.guild_command_create(evalcommand, 545231706299301888);
-            printf("Compile command created\n");
+            //bot.guild_command_create(evalcommand, 545231706299301888);
+            printf("Eval command created\n");
+            
+            dpp::slashcommand removecommand("unregister", "Unregister a command", bot.me.id);
+            removecommand.add_option(
+				dpp::command_option(dpp::co_boolean, "global", "global/guild", "true for global command, false for guild command.")
+			);
+			removecommand.add_option(
+				dpp::command_option(dpp::co_string, "command", "Command ID", true)
+			);
+			removecommand.set_default_permissions(0);
+			bot.guild_command_create(removecommand, 545231706299301888);
             
         }
         } catch (const std::exception& e){
@@ -224,7 +232,22 @@ int main()
 				event.reply(ss.str());
 				
 			
-			} else {
+			} else if(commandname == "unregister"){
+				std::cout << event.command.member.user_id << '\n';
+				if(event.command.member.user_id != 427889181121839106){
+					event.reply("You are not allowed to use this command.");
+					return;
+				}
+				
+				dpp::snowflake comid = std::stoul(std::get<std::string>(event.get_parameter("command")));
+				if (std::get<bool>(event.get_parameter("global"))) {
+					bot.global_command_delete(comid);
+					event.reply("Removed the global command");
+				} else {
+					bot.guild_command_delete(comid, event.command.guild_id);
+					event.reply("Removed the guild command");
+				}
+			}else {
 				std::stringstream ss;
 				ss << event.command.guild_id << event.command.get_command_name();
 				std::cout << "running command: " << event.command.get_command_name() << '\n';
@@ -246,7 +269,7 @@ int main()
 				event.reply(dpp::message(rep));
 			}
     	} catch(const std::exception& e){
-    		std::cout << e.what();
+    		std::cout << e.what() << '\n';
     		event.reply(dpp::message("An unhandled error has occured"));
     	}
     });

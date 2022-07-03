@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <unistd.h>
 
 #include "ks_exports.h"
 #include "ks_internal.h"
@@ -66,6 +67,7 @@ void* kela_compile(void* args){
 }
 
 void* kela_run(void* argv){
+	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 	printf("run thread\n");
 	kela_function* func = get_function(funcname);
 	if(!func) {printf("function not found\n"); return 0;}
@@ -85,6 +87,7 @@ void* kela_run(void* argv){
 }
 
 void* kela_eval(void* args){
+	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 	kela_function kelfun;
 	symbols = kelfun.symbols;
 	initialise_symbols();
@@ -105,6 +108,13 @@ void* kela_eval(void* args){
 
 }
 
+void* timeout_thread(void* main_thread){
+	printf("timeout thread start\n");
+	sleep(2);
+	printf("timeout!\n");
+	printf("cancelled (%d).\n", pthread_cancel((pthread_t) main_thread));
+}
+
 pthread_mutex_t uses_global_variables;
 
 char* eval(char* script){
@@ -112,21 +122,25 @@ char* eval(char* script){
 	script_string = script;
 	script_char_ind = 0;
 	parcount = 0;
-	pthread_t thread;
-	int res = pthread_create(&thread, NULL, kela_eval, NULL);
+	pthread_t mainthread;
+	pthread_t timethread;
+	int res = pthread_create(&mainthread, NULL, kela_eval, NULL);
 	if(res){
 		pthread_mutex_unlock(&uses_global_variables);
 		return strdup("Failed to initiate compilation");
 	}
+	pthread_create(&timethread, NULL, timeout_thread, (void*) mainthread);
 		//printf("failed to create compilation thread! (%d)\n", res); return res;}
 	char* rep = NULL;
-	res = pthread_join(thread, (void**) &rep);
+	res = pthread_join(mainthread, (void**) &rep);
 	if(res){
 		pthread_mutex_unlock(&uses_global_variables);
 		return strdup("Unhandled error during compilation");
 	}
-
 	pthread_mutex_unlock(&uses_global_variables);
+	if((void*) rep == PTHREAD_CANCELED) return strdup("Execution timed out");
+	printf("execution success!\n");
+	pthread_cancel(timethread);
 	return rep;
 	
 }
@@ -160,22 +174,25 @@ char* compile(char* name, int parameter_count, char** parameter_names, int* para
 char* run_function(char* name, int* parameter_values){
 	pthread_mutex_lock(&uses_global_variables);
 	funcname = strdup(name);
-	pthread_t thread;
+	pthread_t mainthread;
+	pthread_t timethread;
 	printf("creating thread...");
-	int res = pthread_create(&thread, NULL, kela_run, (void*) parameter_values);
+	int res = pthread_create(&mainthread, NULL, kela_run, (void*) parameter_values);
 	if(res){
 		pthread_mutex_unlock(&uses_global_variables);
 		return strdup("Failed to initiate execution");
 	}
-	int ret;
-	res = pthread_join(thread, (void**) &ret);
+	pthread_create(&timethread, NULL, timeout_thread, (void*) mainthread);
+	long ret;
+	res = pthread_join(mainthread, (void**) &ret);
 	if(res){
 		pthread_mutex_unlock(&uses_global_variables);
 		return strdup("Unhandled error during execution");
 	}
+	pthread_mutex_unlock(&uses_global_variables);
+	if((void*) ret == PTHREAD_CANCELED) return strdup("Execution timed out");
 	char* rep = malloc(100);
 	rep[99] = '\0'; //just in case something goes wrong next step
-	snprintf(rep, 99, "Call returned: %d", ret);
-	pthread_mutex_unlock(&uses_global_variables);
+	snprintf(rep, 99, "Call returned: %ld", ret);
 	return rep;
 }

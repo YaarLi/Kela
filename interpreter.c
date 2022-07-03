@@ -6,8 +6,8 @@ jmp_buf jump_buffer;
 volatile char returned = (char) 0;
 
 int execute1(TreeNode* N){
-	  int R; //for temporary variable in case (the '=' case)
-	  printf("%d %c %d\n", (int) N->type, N->type, N->leaf_value);
+	  //int R; //for temporary variable in case (the '=' case)
+	  //printf("%d %c %d\n", (int) N->type, N->type, N->leaf_value);
 	  switch(N->type){
 		case 0:
 			return 0;
@@ -26,9 +26,9 @@ int execute1(TreeNode* N){
 		case '%':
 			return execute1(N->args[0]) % execute1(N->args[1]);
 		case '=':
-			R = execute1(N->args[1]);
-			symbols[N->args[0]->leaf_value].value = R;
-			return R;
+			//R = execute1(N->args[1]);
+			return symbols[N->args[0]->leaf_value].value = execute1(N->args[1]);
+			//return R;
 		case '<':
 			return (int) (execute1(N->args[0]) < execute1(N->args[1]));
 		case '>':
@@ -40,7 +40,7 @@ int execute1(TreeNode* N){
 			while(execute1(N->args[0])) execute1(N->args[1]);
 			return execute1(N->args[2]);
 		case IF:
-			if(execute1(N->args[0])) execute1(N->args[1]);
+			if(execute1(N->args[0])) return execute1(N->args[1]);
 			return execute1(N->args[2]);
 		case RETURN:
 			returned = 1;
