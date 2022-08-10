@@ -1,24 +1,25 @@
 #pragma once
 
-#include <wchar.h>
-
 #define STRINGIFY(s) #s
 
 #define LEX_LEN_MAX 128
 
+#include "ks_mutual.h"
+
 extern char const * script_string;
 extern int script_char_ind;
 extern int line_ind;
-extern int cur_token_val;
+extern symval cur_token_val;
 extern int declaration_type;
 
 #define MAX_SYMBOL_COUNT 100
+
 
 struct symbol { 
     char *lexeme; 
     int sym_type;
     int val_type;
-    int value;
+    symval value;
 };
 //extern struct symbol symbols[];
 extern struct symbol* symbols;
@@ -28,14 +29,48 @@ int lookup(char*);
 int insert(char* lexeme, int type);
 
 //lexeme types
-#define INT    256
-#define ID     259
-#define TYPE   260
-#define WHILE  261
-#define IF     262
-#define ELSE   263
-#define RETURN 264
-#define DONE   265
+#define TYPE   256
+#define WHILE  257
+#define IF     258
+#define ELSE   259
+#define RETURN 260
+
+//#define INT    263
+//#define IDINT  264
+#define ADDINT 265
+#define SUBINT 266
+#define MULINT 267
+#define DIVINT 268
+#define MODINT 269
+#define GTINT  270
+#define LTINT  271
+#define SETINT 272
+
+#define ADDFLOAT 273
+#define SUBFLOAT 274
+#define MULFLOAT 275
+#define DIVFLOAT 276
+#define GTFLOAT  277
+#define LTFLOAT  278
+#define SETFLOAT 279
+//#define FLOAT  280
+//#define IDFLOAT 281
+
+#define DONE   282
+
+/*
+inline char returnsint(int lexeme){
+	if(lexeme >= INT && lexeme <= FLOAT2INT) return (char) 1;
+	return (char) 0;
+}
+
+inline char returnsfloat(int lexeme){
+	if(lexeme >= ADDFLOAT && lexeme <= IDFLOAT) return (char) 1;
+	return (char) 0;
+}
+*/
+
+
 
 int lexical();
 
@@ -46,7 +81,7 @@ void comp_err(char* message);
 typedef struct TN TreeNode;
 struct TN {
   int type;
-  int leaf_value;
+  symval leaf_value;
   TreeNode* args[MAX_ARGS];
 
 };
@@ -54,6 +89,6 @@ struct TN {
 TreeNode* parse();
 
 void printtree(TreeNode* p);
-int execute(TreeNode* N);
+double execute_tree(TreeNode* N);
 
 #define STACK_SIZE 2000

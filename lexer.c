@@ -33,16 +33,18 @@ int insert(char* lexeme, int type){
 void initialise_symbols(){
 	symbol_count = 0;
 	int s = insert("int", TYPE);
-	symbols[s].value = INT;
+	symbols[s].value.integer = IDINT;
 	insert("while", WHILE);
 	insert("if", IF);
 	insert("else", ELSE);
 	insert("return", RETURN);
+	s = insert("float", TYPE);
+	symbols[s].value.integer = IDFLOAT;
 }
 
 char lexeme[LEX_LEN_MAX+1];
 int line_ind = 1;
-int cur_token_val = -1;
+symval cur_token_val = {.integer = -1};
 int declaration_type = 0;
 
 int lexical(){
@@ -69,7 +71,7 @@ int lexical(){
       case '}':
       case '<':
       case '>':
-    	  cur_token_val = c;
+    	  cur_token_val.integer = (int) c;
     	  return c;
       case '\0':
       case EOF:
@@ -78,7 +80,12 @@ int lexical(){
       default:
         if(isdigit(c)){
             int scanned;
-            sscanf(script_string+script_char_ind-1, "%d%n", &cur_token_val, &scanned);
+            sscanf(script_string+script_char_ind-1, "%lld%n", &cur_token_val.integer, &scanned);
+            if(script_string[script_char_ind-1+scanned] == '.'){
+				sscanf(script_string+script_char_ind-1, "%lf%n", &cur_token_val.floating, &scanned);
+				script_char_ind+=scanned-1;
+				return FLOAT;
+			}
             script_char_ind+=scanned-1;
             //printf("scanned %d: %d char", cur_token_val, scanned);
             return INT;
@@ -96,7 +103,7 @@ int lexical(){
             //printf("%s\n", lexeme);
             script_char_ind--;
             if(declaration_type){ //if the ID follows a declaration
-            	id_num = insert(lexeme, ID);
+            	id_num = insert(lexeme, declaration_type);
             } else {
             	id_num = lookup(lexeme);
             }
@@ -109,11 +116,11 @@ int lexical(){
             }
             int t = symbols[id_num].sym_type;
             if(t == TYPE){
-            	cur_token_val = symbols[id_num].value;
-            	declaration_type = cur_token_val;
+            	cur_token_val.integer = symbols[id_num].value.integer;
+            	declaration_type = cur_token_val.integer;
             	return t;
             }
-            cur_token_val = id_num;
+            cur_token_val.integer = id_num;
             return t;
         }
     //return c;

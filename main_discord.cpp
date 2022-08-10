@@ -38,7 +38,7 @@ char** to_cstring_array(std::string message, int* size){
 	return array;
 }
 
-void save_command(std::string name, dpp::snowflake guild_id, std::string code, int n_parameters, char** params){
+void save_command(std::string name, dpp::snowflake guild_id, std::string code, int n_parameters, char** params, int* partypes){
 	std::ofstream commands_file;
 	commands_file.open("saved_commands.txt", std::ofstream::out | std::ofstream::app);
 	if(!commands_file.is_open()){
@@ -47,6 +47,11 @@ void save_command(std::string name, dpp::snowflake guild_id, std::string code, i
 	}
 	commands_file << '\n' << guild_id << '\n' << name << '\n' << n_parameters << '\n';
 	for(int i = 0; i < n_parameters; i++){
+		if(partypes[i] == IDINT){
+			commands_file << "int ";
+		} else if(partypes[i] == IDFLOAT){
+			commands_file << "float ";
+		}
 		commands_file << params[i] << ' ';
 	}
 	commands_file << '\n' << code.length() << '\n' << code;
@@ -64,6 +69,10 @@ void load_saved_commands(){
 		std::cout << "loading command\n";
 		dpp::snowflake guild_id;
 		commands_file >> guild_id;
+		if(!commands_file){
+			std::cout << "...or not\n";
+			return;
+		}
 		std::string name;;
 		commands_file >> name;
 		std::cout << "name: " << name << '\n';
@@ -76,8 +85,14 @@ void load_saved_commands(){
 			std::string tmp;
 			commands_file >> tmp;
 			std::cout << ' ' << tmp;
+			if(tmp == "int"){
+				partypes[i] = IDINT;
+			} else if(tmp == "float"){
+				partypes[i] = IDFLOAT;
+			}
+			commands_file >> tmp;
+			std::cout << ' ' << tmp;
 			params[i] = strdup(tmp.c_str());
-			partypes[i] = INT;
 		}
 		int codelen;
 		commands_file >> codelen;
@@ -136,14 +151,17 @@ int main()
                     dpp::command_option(dpp::co_string, "name", "The name of the command", true)
             );
             compcommand.add_option(
-					dpp::command_option(dpp::co_string, "int_parameters", "The variable names of integer parameters", true)
-			);
-            compcommand.add_option(
             		dpp::command_option(dpp::co_string, "code", "The actual code", true)
             );
             compcommand.add_option(
             		dpp::command_option(dpp::co_string, "description", "The description that the user sees for the new slash command", true)
             );
+            compcommand.add_option(
+					dpp::command_option(dpp::co_string, "int_parameters", "The variable names of integer parameters", false)
+			);
+			compcommand.add_option(
+					dpp::command_option(dpp::co_string, "float_parameters", "The variable names of floating point parameters", false)
+			);
 
             /* Register the command */
             bot.global_command_create(compcommand);
@@ -185,14 +203,44 @@ int main()
 			std::string commandname = event.command.get_command_name();
 			if (commandname == "compile") {
 				std::cout << "getting compilation data\n";
-				int varcount;
+				
 				//auto p = event.get_parameter("name");
 				std::string funcname = std::get<std::string>(event.get_parameter("name"));
-				std::string intvars = std::get<std::string>(event.get_parameter("int_parameters"));
+				
+				dpp::command_value p = event.get_parameter("int_parameters");
+				std::string intvars = "";
+				if(std::holds_alternative<std::string>(p))
+					intvars = std::get<std::string>(p);
+			
+				p = event.get_parameter("float_parameters");
+				std::string floatvars = "";
+				if(std::holds_alternative<std::string>(p))
+					floatvars = std::get<std::string>(p);
+					
 				std::cout << "setting up variables\n";
-				char** varnames = to_cstring_array(intvars, &varcount);
-				int* vartypes = (int*) malloc(sizeof(int)*varcount);
-				for(int i = 0; i < varcount; i++){vartypes[i] = INT;std::cout << "variable " << varnames[i] << '\n';}
+				int intcount;
+				char** intnames = to_cstring_array(intvars, &intcount);
+				int floatcount;
+				char** floatnames = to_cstring_array(floatvars, &floatcount);
+				int varcount = intcount+floatcount;
+				
+				char** varnames = (char**) malloc(sizeof(char*)*(varcount));
+				
+				int* vartypes = (int*) malloc(sizeof(int)*(varcount));
+				for(int i = 0; i < intcount; i++){
+					vartypes[i] = IDINT;
+					varnames[i] = intnames[i];
+					std::cout << "variable " << varnames[i] << '\n';
+					
+				}
+				delete intnames;
+				for(int i = 0; i < floatcount; i++){
+					vartypes[intcount+i] = IDFLOAT;
+					varnames[intcount+i] = floatnames[i];
+					std::cout << "variable " << floatnames[i] << '\n';
+					
+				}
+				delete floatnames;
 				std::string rawcode = std::get<std::string>(event.get_parameter("code"));
 				std::cout << "copying code\n";
 				char* code = strdup(rawcode.c_str());
@@ -211,13 +259,28 @@ int main()
 				std::cout << "registering command\n";
 				dpp::slashcommand newcommand(funcname, description, bot.me.id);
 				for(int i = 0; i < varcount; i++){
-					newcommand.add_option(
-							dpp::command_option(dpp::co_integer, varnames[i], varnames[i], true)
-					);
+					if(vartypes[i] == IDINT){
+						newcommand.add_option(
+								dpp::command_option(dpp::co_integer, varnames[i], varnames[i], true)
+						);
+					} else if(vartypes[i] == IDFLOAT){
+						newcommand.add_option(
+								dpp::command_option(dpp::co_number, varnames[i], varnames[i], true)
+						);
+					}
 				}
 				bot.guild_command_create(newcommand, event.command.guild_id);
-				save_command(funcname, event.command.guild_id, rawcode, varcount, varnames);
+				save_command(funcname, event.command.guild_id, rawcode, varcount, varnames, vartypes);
 				event.reply(dpp::message("Compilation successful, you should see the new slash command shortly!"));
+				
+				//cleanup
+				for(int i = 0; i < varcount; i++){
+					delete varnames[i];
+				}
+				delete varnames;
+				delete vartypes;
+				delete code;
+				
 			} else if(commandname == "eval"){
 				std::string rawcode = std::get<std::string>(event.get_parameter("code"));
 				char* code = strdup(rawcode.c_str());
@@ -256,13 +319,32 @@ int main()
 				std::cout << "getting parameters...\n";
 				char const * const * param_names = get_function_parameters(internal_command_name, &parcount);
 				if(!param_names){event.reply(dpp::message("Could not fetch the command")); return;}
-				int* param_values = (int*) malloc(parcount*sizeof(int));
+				symval* param_values = (symval*) malloc(parcount*sizeof(symval));
 				std::cout << "writing " << parcount << " parameter values...\n";
+				std::vector<dpp::command_data_option> options = event.command.get_command_interaction().options;
+				{
+				int i = 0;
+				for(auto o : options){
+					if(o.type == dpp::co_integer){
+						param_values[i].integer = std::get<int64_t>(o.value);
+					} else if(o.type == dpp::co_number){
+						param_values[i].floating = std::get<double>(o.value);
+					} else {
+						std::cout << "UNRECOGNIZED TYPE\n";
+					}
+					i++;
+				}
+				}
+				/*
 				for(int i = 0; i < parcount; i++){
 					std::cout << param_names[i] << ' ';
-					param_values[i] = std::get<int64_t>(event.get_parameter(param_names[i]));
+					if(partypes[i] == IDINT)
+						param_values[i] = std::get<int64_t>(event.get_parameter(param_names[i]));
+					else if(partypes[i] == IDFLOAT)
+						param_values[i] = std::get<double>(event.get_parameter(param_names[i]));
 					std::cout << param_values[i] << '\n';
 				}
+				*/
 				std::cout << "running...\n";
 				std::cout << "(the function)\n";
 				char* rep = run_function(internal_command_name, param_values);

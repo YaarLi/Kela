@@ -52,9 +52,9 @@ void* kela_compile(void* args){
 	result->parameters = malloc(parcount*sizeof(char*));
 	for(int i = 0; i < parcount; i++){
 		result->parameters[i] = strdup(parnames[i]);
-		int j = insert(parnames[i], ID);
+		int j = insert(parnames[i], partypes[i]);
 		symbols[j].val_type = partypes[i];
-		printf("%d %s %d\n", j, symbols[j].lexeme, symbols[j].value);
+		printf("%d %s %lld %lf\n", j, symbols[j].lexeme, symbols[j].value.integer, symbols[j].value.floating);
 	}
 	result->parameter_count = parcount;
 	result->tree = parse();
@@ -77,13 +77,19 @@ void* kela_run(void* argv){
 	for(int i = 0; i < func->parameter_count; i++){
 		printf("looking up\n");
 		int j = lookup(func->parameters[i]);
+		if(j < 0){
+			printf("variable not found!\n");
+			continue;
+		}
 		printf("setting value\n");
-		symbols[j].value = ((int*) argv)[i];
-		printf("%d %s %d\n", j, symbols[j].lexeme, symbols[j].value);
+		symbols[j].value = ((symval*) argv)[i];
+		printf("%d %s %lld %lf\n", j, symbols[j].lexeme, symbols[j].value.integer, symbols[j].value.floating);
+		
 	}
 	if(!func->tree){printf("function has no tree!\n"); return 0;}
-	int ret = execute(func->tree);
-	return (void*) (long) ret;
+	double* ret = malloc(sizeof(double));
+	*ret = execute_tree(func->tree);
+	return (void*) ret;
 }
 
 void* kela_eval(void* args){
@@ -99,11 +105,11 @@ void* kela_eval(void* args){
 		return strdup("Compilation NULL error!\n");
 	}
 	
-	int ret = execute(kelfun.tree);
+	double ret = execute_tree(kelfun.tree);
 	
 	char* rep = malloc(100);
 	rep[99] = '\0'; //just in case something goes wrong next step
-	snprintf(rep, 99, "Call returned: %d", ret);
+	snprintf(rep, 99, "Call returned: %lf", ret);
 	return rep;
 
 }
@@ -171,7 +177,7 @@ char* compile(char* name, int parameter_count, char** parameter_names, int* para
 	return errmsg; //NULL if success
 }
 
-char* run_function(char* name, int* parameter_values){
+char* run_function(char* name, symval* parameter_values){
 	pthread_mutex_lock(&uses_global_variables);
 	funcname = strdup(name);
 	pthread_t mainthread;
@@ -183,7 +189,7 @@ char* run_function(char* name, int* parameter_values){
 		return strdup("Failed to initiate execution");
 	}
 	pthread_create(&timethread, NULL, timeout_thread, (void*) mainthread);
-	long ret;
+	double* ret;
 	res = pthread_join(mainthread, (void**) &ret);
 	if(res){
 		pthread_mutex_unlock(&uses_global_variables);
@@ -193,6 +199,7 @@ char* run_function(char* name, int* parameter_values){
 	if((void*) ret == PTHREAD_CANCELED) return strdup("Execution timed out");
 	char* rep = malloc(100);
 	rep[99] = '\0'; //just in case something goes wrong next step
-	snprintf(rep, 99, "Call returned: %ld", ret);
+	snprintf(rep, 99, "Call returned: %lf", *ret);
+	free(ret);
 	return rep;
 }
